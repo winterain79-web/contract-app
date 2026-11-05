@@ -1,5 +1,5 @@
 import { parseMan } from '../../lib/koreanMoney.js';
-import { EXCLUDE_OPTIONS, fillPreset } from './constants.js';
+import { CUSTOM_OPT, EXCLUDE_OPTIONS, SLOT_COUNT, dutyLines } from './constants.js';
 
 export const todayISO = () => {
   const d = new Date();
@@ -12,9 +12,9 @@ export function emptyData() {
   return {
     nationality: '',
     applyType: 'visa',
-    presetId: 'A',
-    duties: fillPreset('A', ''),
-    dutiesEdited: false,
+    // 제4조 대행내용 (1)~(5). opt: 후보 id | 'custom' | ''(비움)
+    // text: 본문(수정 가능), edited: 본문을 손으로 고쳤는지, extra: 부가 문구
+    slots: emptySlots(),
     total: '',
     deposit: '',
     payMode: 'once', // once | twice
@@ -35,7 +35,35 @@ export function emptyData() {
   };
 }
 
-export const normalize = (d) => ({ ...emptyData(), ...(d || {}) });
+export const emptySlot = () => ({ opt: '', text: '', edited: false, extra: '' });
+export const emptySlots = () => Array.from({ length: SLOT_COUNT }, emptySlot);
+
+/** 저장된 데이터(이전 버전 포함)를 현재 형식으로 맞춘다 */
+export function normalize(raw) {
+  const d = { ...emptyData(), ...(raw || {}) };
+  if (d.applyType !== 'visa' && d.applyType !== 'change') d.applyType = 'change'; // 이전 '자진출국 후 사증발급'
+  if (!Array.isArray(raw?.slots) && typeof raw?.duties === 'string') {
+    // 이전 버전: 줄 단위 텍스트 → 직접 입력 항목으로 옮김
+    const lines = dutyLines(raw.duties);
+    d.slots = emptySlots().map((s, i) =>
+      lines[i] !== undefined ? { ...s, opt: CUSTOM_OPT, text: lines[i], edited: true } : s
+    );
+    if (lines.length > SLOT_COUNT) d.slots[SLOT_COUNT - 1].text += ' ' + lines.slice(SLOT_COUNT).join(' ');
+  }
+  d.slots = emptySlots().map((s, i) => ({ ...s, ...(d.slots[i] || {}) }));
+  delete d.duties;
+  delete d.dutiesEdited;
+  delete d.presetId;
+  return d;
+}
+
+/** 계약서에 들어갈 대행내용 줄 (빈 항목은 빠지고 번호는 앞으로 당겨짐) */
+export function dutyItems(d) {
+  return d.slots
+    .filter((s) => s.opt)
+    .map((s) => [s.text.trim(), s.extra.trim()].filter(Boolean).join(' '))
+    .filter(Boolean);
+}
 
 /** 금액 계산: 잔금이 비어 있으면 총액 − 착수금 − 중도금으로 자동 계산 */
 export function amounts(d) {
@@ -85,6 +113,7 @@ export function validate(d) {
   if (!d.address.trim()) errors.address = '주소를 입력하세요.';
   if (!dateParts(d.contractDate)) errors.contractDate = '계약일을 선택하세요.';
 
+  if (dutyItems(d).length === 0) warnings.push('제4조 대행내용 항목이 하나도 없습니다.');
   if (!d.phone.trim()) warnings.push('연락처가 비어 있습니다. 계약서에 연락처 줄이 빠집니다.');
 
   const a = amounts(d);

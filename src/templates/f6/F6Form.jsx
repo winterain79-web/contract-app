@@ -1,10 +1,10 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { formatMan } from '../../lib/koreanMoney.js';
 import {
-  ACCOUNTS, APPLY_TYPES, CUSTOM_PRESET, EXCLUDE_OPTIONS, QUICK_INSERTS, TIMING_OPTIONS,
-  dutyLines, fillPreset, presetsFor,
+  ACCOUNTS, APPLY_TYPES, CUSTOM_OPT, EXCLUDE_OPTIONS, QUICK_INSERTS, TIMING_OPTIONS,
+  fillNat, optionText, optionsFor,
 } from './constants.js';
-import { amounts, formatRrn } from './model.js';
+import { amounts, emptySlots, formatRrn } from './model.js';
 
 function Field({ label, error, hint, children, id }) {
   return (
@@ -43,66 +43,106 @@ function ManInput({ value, onChange, placeholder }) {
   );
 }
 
-export default function F6Form({ data, update, errors }) {
-  const taRef = useRef(null);
-  // 줄바꿈된 내용까지 다 보이도록 높이 자동 조절
+/** 늘어나는 입력칸 (긴 문구도 다 보이게) */
+function AutoText({ value, onChange, onFocus, placeholder, className }) {
+  const ref = useRef(null);
   useLayoutEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = `${ta.scrollHeight + 2}px`;
-  }, [data.duties]);
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      className={className}
+      value={value}
+      placeholder={placeholder}
+      onFocus={onFocus}
+      onChange={(e) => onChange(e.target.value.replace(/\n/g, ' '))}
+    />
+  );
+}
+
+/** 시점: 직접 입력 + 자주 쓰는 시점 버튼 */
+function TimingField({ label, value, onChange }) {
+  return (
+    <Field label={label} hint="버튼을 누르거나 칸에 직접 입력하세요.">
+      <div className="clearable">
+        <input value={value} placeholder="직접 입력" onChange={(e) => onChange(e.target.value)} />
+        {value && (
+          <button type="button" className="clear-x" aria-label="지우기" onClick={() => onChange('')}>
+            ✕
+          </button>
+        )}
+      </div>
+      <div className="chips">
+        {TIMING_OPTIONS.map((t) => (
+          <button type="button" key={t} className={`chip small ${value === t ? 'on' : ''}`} onClick={() => onChange(t)}>
+            {t}
+          </button>
+        ))}
+      </div>
+    </Field>
+  );
+}
+
+export default function F6Form({ data, update, errors }) {
   const a = amounts(data);
-  const presets = presetsFor(data.applyType);
+  const options = optionsFor(data.applyType);
+  const [active, setActive] = useState(0); // 부가 문구를 붙일 항목
+  const [customExtra, setCustomExtra] = useState('');
+
+  const setSlot = (i, patch) => update({ slots: data.slots.map((s, j) => (j === i ? { ...s, ...patch } : s)) });
 
   const setNationality = (nationality) => {
-    const patch = { nationality };
-    if (!data.dutiesEdited && data.presetId !== CUSTOM_PRESET) patch.duties = fillPreset(data.presetId, nationality);
-    update(patch);
+    // 손대지 않은 항목은 국적을 바꾸면 문구도 따라 바뀐다
+    const slots = data.slots.map((s) =>
+      s.opt && s.opt !== CUSTOM_OPT && !s.edited ? { ...s, text: optionText(s.opt, nationality) } : s
+    );
+    update({ nationality, slots });
   };
 
   const setApplyType = (applyType) => {
     if (applyType === data.applyType) return;
-    const first = presetsFor(applyType)[0];
-    if (data.dutiesEdited && !confirm('신청 유형을 바꾸면 수정한 대행내용이 기본 문구로 바뀝니다. 계속할까요?')) {
-      update({ applyType, presetId: CUSTOM_PRESET });
-      return;
+    const filled = data.slots.some((s) => s.opt);
+    if (filled && confirm('신청 유형을 바꾸면 대행내용 항목을 비웁니다. 비울까요?\n(취소를 누르면 지금 문구를 직접 입력 상태로 남깁니다)')) {
+      update({ applyType, slots: emptySlots() });
+    } else {
+      update({ applyType, slots: data.slots.map((s) => (s.opt ? { ...s, opt: CUSTOM_OPT, edited: true } : s)) });
     }
-    update({ applyType, presetId: first.id, duties: fillPreset(first.id, data.nationality), dutiesEdited: false });
   };
 
-  const setPreset = (presetId) => {
-    if (presetId === CUSTOM_PRESET) {
-      update({ presetId, dutiesEdited: true });
-      return;
-    }
-    if (data.dutiesEdited && !confirm('수정한 대행내용을 기본 문구로 바꿀까요?')) return;
-    update({ presetId, duties: fillPreset(presetId, data.nationality), dutiesEdited: false });
+  const chooseOpt = (i, opt) => {
+    setActive(i);
+    if (opt === '') return setSlot(i, { opt: '', text: '', edited: false, extra: '' });
+    if (opt === CUSTOM_OPT) return setSlot(i, { opt, text: data.slots[i].opt ? data.slots[i].text : '', edited: true });
+    setSlot(i, { opt, text: optionText(opt, data.nationality), edited: false });
   };
 
-  // 커서가 있는 줄 끝에 부가 문구를 붙인다
-  const quickInsert = (txt) => {
-    const ta = taRef.current;
-    const v = data.duties;
-    const pos = ta ? ta.selectionStart ?? v.length : v.length;
-    let end = v.indexOf('\n', pos);
-    if (end < 0) end = v.length;
-    const start = v.lastIndexOf('\n', pos - 1) + 1;
-    const line = v.slice(start, end);
-    if (line.includes(txt)) return;
-    const next = v.slice(0, end).replace(/\s+$/, '') + ' ' + txt + v.slice(end);
-    update({ duties: next, dutiesEdited: true });
-    requestAnimationFrame(() => {
-      if (!ta) return;
-      const caret = end + txt.length + 1;
-      ta.focus();
-      ta.setSelectionRange(caret, caret);
-    });
+  const addExtra = (raw) => {
+    const txt = fillNat(raw, data.nationality).trim();
+    if (!txt) return;
+    const i = data.slots[active]?.opt ? active : data.slots.findLastIndex((s) => s.opt);
+    if (i < 0) {
+      alert('먼저 부가 문구를 붙일 항목을 선택하세요.');
+      return;
+    }
+    const cur = data.slots[i].extra.trim();
+    if (cur.includes(txt)) return;
+    setSlot(i, { extra: cur ? `${cur} ${txt}` : txt });
+    setActive(i);
   };
+
+  // 계약서에 실제로 찍힐 번호 (빈 항목은 건너뜀)
+  let n = 0;
+  const numbers = data.slots.map((s) => (s.opt && (s.text.trim() || s.extra.trim()) ? ++n : null));
+  const activeNo = numbers[active];
+  const quick = [...QUICK_INSERTS.common, ...(QUICK_INSERTS[data.applyType] || [])];
 
   const sumMid = (a.deposit || 0) + (a.mid || 0);
-  const balPlaceholder = a.total !== null && a.total - sumMid >= 0 ? `자동: ${a.total - sumMid}` : '';
-  const lines = dutyLines(data.duties);
+  const balPlaceholder = a.total !== null && a.total - sumMid >= 0 ? `자동: ${a.total - sumMid}` : '0';
 
   return (
     <>
@@ -115,40 +155,86 @@ export default function F6Form({ data, update, errors }) {
         <Field label="신청 유형">
           <Seg value={data.applyType} options={APPLY_TYPES} onChange={setApplyType} />
         </Field>
-        <Field label="제4조 대행내용 기본 문구">
-          <select value={data.presetId} onChange={(e) => setPreset(e.target.value)}>
-            {presets.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-            <option value={CUSTOM_PRESET}>직접 입력</option>
-          </select>
-        </Field>
-        <Field
-          label={`대행내용 (한 줄에 한 항목 · 번호 자동)${data.dutiesEdited && data.presetId !== CUSTOM_PRESET ? ' · 수정됨' : ''}`}
-          hint={`${lines.length}개 항목 → (1)~(${lines.length || 1})`}
-        >
-          <textarea
-            ref={taRef}
-            rows={4}
-            value={data.duties}
-            onChange={(e) => update({ duties: e.target.value, dutiesEdited: true })}
-          />
+
+        <div className="field">
+          <label>제4조 대행내용 (최대 5개 · 비운 항목은 빠지고 번호는 자동)</label>
+          {data.slots.map((s, i) => (
+            <div key={i} className={`slot ${s.opt ? 'filled' : ''} ${active === i ? 'active' : ''}`} onClick={() => setActive(i)}>
+              <div className="slot-head">
+                <span className="slot-no">{numbers[i] ? `(${numbers[i]})` : '—'}</span>
+                <select value={s.opt} onChange={(e) => chooseOpt(i, e.target.value)}>
+                  <option value="">{s.opt ? '— 이 항목 비우기 —' : '항목 선택 (비워 두면 생략)'}</option>
+                  {options.map(([id, t]) => (
+                    <option key={id} value={id}>
+                      {fillNat(t, data.nationality)}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_OPT}>✎ 직접 입력</option>
+                </select>
+              </div>
+              {s.opt && (
+                <>
+                  <AutoText
+                    className="slot-text"
+                    value={s.text}
+                    placeholder="문구를 입력하세요"
+                    onFocus={() => setActive(i)}
+                    onChange={(text) => setSlot(i, { text, edited: true })}
+                  />
+                  {s.edited && s.opt !== CUSTOM_OPT && (
+                    <button type="button" className="link-btn" onClick={() => setSlot(i, { text: optionText(s.opt, data.nationality), edited: false })}>
+                      ↺ 원래 문구로
+                    </button>
+                  )}
+                  {s.extra !== '' && (
+                    <div className="slot-extra">
+                      <span>부가</span>
+                      <AutoText value={s.extra} onFocus={() => setActive(i)} onChange={(extra) => setSlot(i, { extra })} />
+                      <button type="button" className="clear-x static" aria-label="부가 문구 삭제" onClick={() => setSlot(i, { extra: '' })}>
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="field extra-panel">
+          <label>부가 문구 → {activeNo ? `(${activeNo})번 항목 끝에 붙이기` : '붙일 항목을 먼저 누르세요'}</label>
           <div className="chips">
-            {QUICK_INSERTS.map((q) => (
-              <button type="button" key={q} className="chip" onMouseDown={(e) => e.preventDefault()} onClick={() => quickInsert(q)}>
-                + {q}
+            {quick.map((q) => (
+              <button type="button" key={q} className="chip" onClick={() => addExtra(q)}>
+                + {fillNat(q, data.nationality)}
               </button>
             ))}
-            {data.dutiesEdited && data.presetId !== CUSTOM_PRESET && (
-              <button type="button" className="chip ghost" onClick={() => update({ duties: fillPreset(data.presetId, data.nationality), dutiesEdited: false })}>
-                ↺ 기본 문구로
-              </button>
-            )}
           </div>
-          <div className="hint">부가 문구는 커서가 있는 줄 끝에 붙습니다.</div>
-        </Field>
+          <div className="inline-add">
+            <input
+              value={customExtra}
+              placeholder="직접 입력 예: (※ 번역 공증 포함)"
+              onChange={(e) => setCustomExtra(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  addExtra(customExtra);
+                  setCustomExtra('');
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn-sm"
+              onClick={() => {
+                addExtra(customExtra);
+                setCustomExtra('');
+              }}
+            >
+              붙이기
+            </button>
+          </div>
+          <div className="hint">붙인 부가 문구는 해당 항목 아래 &lsquo;부가&rsquo; 칸에서 고치거나 ✕로 지울 수 있습니다.</div>
+        </div>
       </section>
 
       {/* 3-2 대행비용 */}
@@ -156,10 +242,10 @@ export default function F6Form({ data, update, errors }) {
         <h2>대행비용</h2>
         <div className="row2">
           <Field label="총 비용" hint={a.total !== null ? formatMan(a.total) : ''}>
-            <ManInput value={data.total} onChange={(total) => update({ total })} placeholder="200" />
+            <ManInput value={data.total} onChange={(total) => update({ total })} placeholder="0" />
           </Field>
           <Field label="착수금" hint={a.deposit !== null ? formatMan(a.deposit) : ''}>
-            <ManInput value={data.deposit} onChange={(deposit) => update({ deposit })} placeholder="100" />
+            <ManInput value={data.deposit} onChange={(deposit) => update({ deposit })} placeholder="0" />
           </Field>
         </div>
         <Field label="잔금 지급 방식">
@@ -170,36 +256,17 @@ export default function F6Form({ data, update, errors }) {
           />
         </Field>
         {data.payMode === 'twice' && (
-          <div className="row2">
-            <Field label="중도금 시점">
-              <input list="timing-options" value={data.midWhen} placeholder="선택 또는 입력" onChange={(e) => update({ midWhen: e.target.value })} />
-            </Field>
+          <>
+            <TimingField label="중도금 시점" value={data.midWhen} onChange={(midWhen) => update({ midWhen })} />
             <Field label="중도금 금액" hint={a.mid !== null ? formatMan(a.mid) : ''}>
-              <ManInput value={data.midAmount} onChange={(midAmount) => update({ midAmount })} />
+              <ManInput value={data.midAmount} onChange={(midAmount) => update({ midAmount })} placeholder="0" />
             </Field>
-          </div>
+          </>
         )}
-        <div className="row2">
-          <Field label="잔금 시점">
-            <input list="timing-options" value={data.balWhen} placeholder="선택 또는 입력" onChange={(e) => update({ balWhen: e.target.value })} />
-          </Field>
-          <Field label="잔금 금액" hint={a.bal !== null ? `${formatMan(a.bal)}${a.balAuto ? ' (자동)' : ''}` : ''}>
-            <ManInput value={data.balAmount} onChange={(balAmount) => update({ balAmount })} placeholder={balPlaceholder} />
-          </Field>
-        </div>
-        <datalist id="timing-options">
-          {TIMING_OPTIONS.map((t) => (
-            <option key={t} value={t} />
-          ))}
-        </datalist>
-        <div className="timing-chips">
-          {TIMING_OPTIONS.map((t) => (
-            <button type="button" key={t} className="chip small" onClick={() => update(data.payMode === 'twice' && !data.midWhen ? { midWhen: t } : { balWhen: t })}>
-              {t}
-            </button>
-          ))}
-          <div className="hint">버튼을 누르면 {data.payMode === 'twice' && !data.midWhen ? '중도금' : '잔금'} 시점에 들어갑니다.</div>
-        </div>
+        <TimingField label="잔금 시점" value={data.balWhen} onChange={(balWhen) => update({ balWhen })} />
+        <Field label="잔금 금액" hint={a.bal !== null ? `${formatMan(a.bal)}${a.balAuto ? ' (자동 계산 · 비워 두면 총 비용−착수금' + (data.payMode === 'twice' ? '−중도금' : '') + ')' : ''}` : ''}>
+          <ManInput value={data.balAmount} onChange={(balAmount) => update({ balAmount })} placeholder={balPlaceholder} />
+        </Field>
 
         <Field label="제5조 (3) 대행비용에 포함되지 않는 사항">
           <select value={data.excludeMode} onChange={(e) => update({ excludeMode: e.target.value })}>

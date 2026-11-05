@@ -83,8 +83,30 @@ details.card[open] > summary h2::after { content: '▴'; }
 .timing-chips .hint { width: 100%; margin-top: 0; }
 .chip { border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; border-radius: 999px; padding: 6px 10px; font-size: 12.5px; }
 .chip.small { padding: 5px 9px; font-size: 12px; background: #f9fafb; border-color: var(--line); color: #374151; }
+.chip.small.on { background: #eef2ff; border-color: #818cf8; color: #3730a3; font-weight: 600; }
 .chip.ghost { background: #fff; border-color: var(--line); color: var(--muted); }
 
+.slot { border: 1px solid var(--line); border-radius: 10px; padding: 8px; margin-bottom: 8px; background: #fafafa; }
+.slot.filled { background: #fff; }
+.slot.active { border-color: #818cf8; box-shadow: 0 0 0 2px #e0e7ff; }
+.slot-head { display: flex; align-items: center; gap: 8px; }
+.slot-no { flex-shrink: 0; width: 30px; text-align: center; font-weight: 700; color: var(--brand); }
+.slot-head select { flex: 1; min-width: 0; text-overflow: ellipsis; }
+.slot.filled .slot-head select { color: var(--muted); font-size: 14px !important; padding-top: 7px; padding-bottom: 7px; }
+.field textarea.slot-text, .slot-extra textarea { margin-top: 6px; line-height: 1.5; resize: none; overflow: hidden; }
+.slot-extra { display: flex; align-items: flex-start; gap: 6px; margin-top: 2px; }
+.slot-extra span { flex-shrink: 0; font-size: 12px; color: #3730a3; background: #eef2ff; border-radius: 6px; padding: 3px 6px; margin-top: 14px; }
+.slot-extra textarea { flex: 1; }
+.link-btn { border: 0; background: none; color: var(--brand); font-size: 12.5px; padding: 4px 2px 0; }
+.extra-panel { background: #f8fafc; border-radius: 10px; padding: 10px; }
+.extra-panel .chips { margin-top: 0; }
+.inline-add { display: flex; gap: 6px; margin-top: 8px; }
+.inline-add input { flex: 1; min-width: 0; }
+.inline-add .btn-sm { flex-shrink: 0; border-radius: 9px; padding: 0 14px; }
+.clearable { position: relative; }
+.clearable input { padding-right: 40px !important; }
+.clear-x { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: #e5e7eb; color: #4b5563; border-radius: 50%; width: 26px; height: 26px; font-size: 12px; }
+.clear-x.static { position: static; transform: none; flex-shrink: 0; margin-top: 12px; }
 .banner { border-radius: 9px; padding: 9px 11px; font-size: 13px; margin-bottom: 10px; }
 .banner.warn { background: #fff7ed; color: var(--warn); border: 1px solid #fed7aa; }
 

@@ -1,6 +1,6 @@
 import { formatMan } from '../../lib/koreanMoney.js';
-import { ACCOUNTS, FIRM, TEXT, dutyLines, kindOf } from './constants.js';
-import { amounts, dateParts, excludeText } from './model.js';
+import { ACCOUNTS, FIRM, TEXT, kindOf } from './constants.js';
+import { amounts, dateParts, dutyItems, excludeText } from './model.js';
 import { Ganin, Nameplate, SealOn } from '../../components/Stamps.jsx';
 
 const U = ({ children }) => <span className="u">{children}</span>;
@@ -16,7 +16,7 @@ export default function F6Pages({ data, stamps, settings, lineHeight = 2, pageRe
   const nat = data.nationality.trim() || BLANK;
   const a = amounts(data);
   const money = (n) => (n === null || n === undefined ? BLANK : formatMan(n));
-  const lines = dutyLines(data.duties);
+  const lines = dutyItems(data);
   const excl = excludeText(data);
   const dp = dateParts(data.contractDate);
   const y = dp ? dp.y : '　　';
