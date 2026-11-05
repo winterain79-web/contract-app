@@ -5,6 +5,7 @@ import {
   fillNat, optionText, optionsFor,
 } from './constants.js';
 import { amounts, emptySlots, formatRrn } from './model.js';
+import ClientImport from '../../components/ClientImport.jsx';
 
 function Field({ label, error, hint, children, id }) {
   return (
@@ -93,15 +94,23 @@ export default function F6Form({ data, update, errors }) {
   const options = optionsFor(data.applyType);
   const [active, setActive] = useState(0); // 부가 문구를 붙일 항목
   const [customExtra, setCustomExtra] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
 
   const setSlot = (i, patch) => update({ slots: data.slots.map((s, j) => (j === i ? { ...s, ...patch } : s)) });
 
-  const setNationality = (nationality) => {
-    // 손대지 않은 항목은 국적을 바꾸면 문구도 따라 바뀐다
-    const slots = data.slots.map((s) =>
+  // 손대지 않은 항목은 국적을 바꾸면 문구도 따라 바뀐다
+  const nationalityPatch = (nationality) => ({
+    nationality,
+    slots: data.slots.map((s) =>
       s.opt && s.opt !== CUSTOM_OPT && !s.edited ? { ...s, text: optionText(s.opt, nationality) } : s
-    );
-    update({ nationality, slots });
+    ),
+  });
+  const setNationality = (nationality) => update(nationalityPatch(nationality));
+
+  const applyImport = (patch) => {
+    const { nationality, ...rest } = patch;
+    update(nationality ? { ...rest, ...nationalityPatch(nationality) } : rest);
+    setImportOpen(false);
   };
 
   const setApplyType = (applyType) => {
@@ -293,6 +302,11 @@ export default function F6Form({ data, update, errors }) {
       {/* 3-3 의뢰인·날짜 */}
       <section className="card">
         <h2>의뢰인 · 날짜</h2>
+        <button type="button" className="import-btn" onClick={() => setImportOpen(true)}>
+          <span>📷 대화 캡처로 자동 입력</span>
+          <small>고객과 주고받은 대화 캡처를 올리면 성명·주민번호·주소·연락처·국적을 채웁니다</small>
+        </button>
+        {importOpen && <ClientImport current={data} onApply={applyImport} onClose={() => setImportOpen(false)} />}
         <Field label="성명" error={errors.clientName} id="clientName">
           <input value={data.clientName} autoComplete="off" onChange={(e) => update({ clientName: e.target.value })} />
         </Field>

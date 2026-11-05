@@ -125,7 +125,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <strong>대행계약서</strong>
+          <strong>더바른행정사법인 계약서 작성</strong>
           <span>{T.name}</span>
         </div>
         <div className="top-actions">

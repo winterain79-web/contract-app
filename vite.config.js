@@ -12,9 +12,9 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['icons/*.png'],
       manifest: {
-        name: '대행계약서 작성',
-        short_name: '대행계약서',
-        description: '더바른행정사법인 행정사 대행 계약서 모바일 작성',
+        name: '더바른행정사법인 계약서 작성',
+        short_name: '더바른행정사법인 계약서 작성',
+        description: '더바른행정사법인 행정사 대행 계약서를 휴대전화에서 작성하는 앱',
         lang: 'ko',
         start_url: './',
         scope: './',
@@ -31,9 +31,16 @@ export default defineConfig({
       workbox: {
         // 앱 본체는 설치 시 미리 저장 → 오프라인에서도 열림
         globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
+        // 글자 인식 엔진(약 5MB)은 처음 쓸 때 내려받아 저장 (앱 설치를 가볍게)
+        globIgnores: ['ocr/**', '**/tesseract*.js'],
         navigateFallback: 'index.html',
         // 한글 웹폰트 조각(woff2)은 처음 쓰일 때 저장
         runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/ocr/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'ocr', expiration: { maxEntries: 20 } },
+          },
           {
             urlPattern: ({ request }) => request.destination === 'font',
             handler: 'CacheFirst',
