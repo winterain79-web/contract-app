@@ -151,6 +151,9 @@ button.primary:disabled { opacity: .6; }
 .result-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 .result-actions button { padding: 13px; border-radius: 10px; font-size: 15.5px; border: 1px solid var(--line); background: #fff; }
 .result-actions button.primary { border: 0; }
+.save-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.save-row button { padding: 13px; border-radius: 10px; font-size: 15.5px; border: 1px solid var(--brand); background: #fff; color: var(--brand); font-weight: 600; }
+.save-row button.done { border-color: var(--ok); color: var(--ok); background: #f0fdf4; }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { canShareFiles, downloadFiles, shareFiles } from '../lib/exportJpg.js';
+import { canShareFiles, downloadFile, shareFiles } from '../lib/exportJpg.js';
 
 /**
  * 공유 시트는 사용자 탭 직후에만 열 수 있어(iOS Safari),
@@ -11,6 +11,13 @@ export default function ExportDialog({ result, onClose }) {
   useEffect(() => () => urls.forEach((u) => URL.revokeObjectURL(u)), [urls]);
   const shareable = canShareFiles(files);
   const [msg, setMsg] = useState('');
+  const [saved, setSaved] = useState(() => files.map(() => false));
+
+  // 휴대전화는 한 번 탭에 파일 1개만 내려받을 수 있어 쪽마다 버튼을 둔다.
+  const saveOne = (i) => {
+    downloadFile(files[i]);
+    setSaved((s) => s.map((v, j) => (j === i ? true : v)));
+  };
 
   async function onShare() {
     try {
@@ -18,8 +25,7 @@ export default function ExportDialog({ result, onClose }) {
       setMsg('공유했습니다.');
     } catch (e) {
       if (e?.name !== 'AbortError') {
-        setMsg('공유하지 못해 파일로 저장합니다.');
-        downloadFiles(files);
+        setMsg('공유하지 못했습니다. 아래 버튼으로 한 쪽씩 저장해 주세요.');
       }
     }
   }
@@ -45,12 +51,16 @@ export default function ExportDialog({ result, onClose }) {
               공유하기 (카카오톡·메일 등)
             </button>
           )}
-          <button type="button" className={shareable ? '' : 'primary'} onClick={() => downloadFiles(files)}>
-            기기에 저장
-          </button>
+        </div>
+        <div className="save-row">
+          {files.map((f, i) => (
+            <button type="button" key={f.name} className={saved[i] ? 'done' : ''} onClick={() => saveOne(i)}>
+              {saved[i] ? `✓ ${i + 1}쪽 저장함` : `${i + 1}쪽 저장`}
+            </button>
+          ))}
         </div>
         {msg && <p className="hint center">{msg}</p>}
-        <p className="hint center">이미지를 길게 눌러 사진 앱에 저장할 수도 있습니다. 작성 이력에 기록되었습니다.</p>
+        <p className="hint center">공유하기는 2장을 한 번에 보냅니다. 저장은 1쪽·2쪽 버튼을 각각 눌러 주세요. 이미지를 길게 눌러 사진 앱에 저장할 수도 있습니다. 작성 이력에 기록되었습니다.</p>
       </div>
     </div>
   );

@@ -48,19 +48,19 @@ export async function shareFiles(files, title) {
   await navigator.share({ files, title });
 }
 
-export function downloadFiles(files) {
-  files.forEach((f, i) => {
-    setTimeout(() => {
-      const url = URL.createObjectURL(f);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = f.name;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        a.remove();
-        URL.revokeObjectURL(url);
-      }, 30000);
-    }, i * 400);
-  });
+/**
+ * 파일 1개 다운로드. 휴대전화 브라우저는 한 번 탭에 다운로드 1개만 허용하므로
+ * 반드시 버튼 클릭 처리 안에서 바로(기다림 없이) 호출한다.
+ */
+export function downloadFile(f) {
+  const url = URL.createObjectURL(f);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = f.name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 30000);
 }
